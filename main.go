@@ -50,6 +50,7 @@ func Decrypt(key string, data []byte) {
 //go:embed config_dict
 //go:embed personal_dict
 //go:embed graphics_dict
+//go:embed mgo_dict
 var f embed.FS
 
 func main() {
@@ -76,6 +77,7 @@ func main() {
 	configData, _ := f.ReadFile("config_dict")
 	personalData, _ := f.ReadFile("personal_dict")
 	graphicsData, _ := f.ReadFile("graphics_dict")
+	mgoData, _ := f.ReadFile("mgo_dict")
 
 	var dictData []byte
 	dictData, _ = os.ReadFile("./dict.txt")
@@ -84,6 +86,7 @@ func main() {
 	data = append(data, configData...)
 	data = append(data, personalData...)
 	data = append(data, graphicsData...)
+	data = append(data, mgoData...)
 
 	dd := bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
 	lines := bytes.Split(dd, []byte("\n"))
@@ -102,6 +105,9 @@ func main() {
 		filename = "TPP_GAME_DATA1"
 	} else {
 		filename = os.Args[1]
+		if os.Args[1] == "-keysOnly" {
+			filename = os.Args[2]
+		}
 	}
 
 	s, err := os.ReadFile(filename)
@@ -110,7 +116,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	keys := []string{"TPP_GAME_DATA", "TPP_CONFIG_DATA", "PERSONAL_DATA", "TPP_GRAPHICS_CONFIG"}
+	keys := []string{"TPP_GAME_DATA", "TPP_CONFIG_DATA", "PERSONAL_DATA", "TPP_GRAPHICS_CONFIG", "MGO_GAME_DATA"}
 	var key string
 	for _, k := range keys {
 		if strings.Contains(filename, k) {
@@ -146,7 +152,7 @@ func main() {
 		saveKey := dict[binary.LittleEndian.Uint32(s[v:])]
 		saveValue := binary.LittleEndian.Uint32(s[v+4:])
 		if keysOnly {
-			fmt.Println(saveKey)
+			fmt.Printf("%s\n", saveKey)
 		} else {
 			fmt.Printf("0x%x\t\t%s: %d\n", v, saveKey, saveValue)
 		}
