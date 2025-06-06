@@ -1,20 +1,17 @@
 package main
 
 import (
-	"embed"
-	_ "embed"
-	"flag"
-	"log/slog"
-	"strings"
-)
-
-import (
 	"bytes"
 	"crypto/md5"
+	"embed"
+	_ "embed"
 	"encoding/binary"
+	"flag"
 	"fmt"
+	"log/slog"
 	"os"
 	"sort"
+	"strings"
 
 	"github.com/unknown321/hashing"
 )
