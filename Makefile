@@ -1,10 +1,10 @@
-PRODUCT=tnt
+PRODUCT=squib
 GOOS=linux
 GOARCH=amd64
 NAME=$(PRODUCT)-$(GOOS)-$(GOARCH)$(EXT)
 EXT=
 ifeq ($(GOOS),windows)
-	override EXT=".exe"
+	override EXT=.exe
 endif
 
 test:
@@ -21,3 +21,4 @@ release: test
 	$(MAKE) GOOS=windows build
 	$(MAKE) GOOS=linux build
 
+.DEFAULT_GOAL=release

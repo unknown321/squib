@@ -60,7 +60,7 @@ func main() {
 	flag.Parse()
 
 	if len(os.Args) < 2 {
-		fmt.Println("TNT: MGSV:TPP save decoder")
+		fmt.Println("Squib: MGSV:TPP save decoder")
 		fmt.Println()
 		fmt.Printf("Usage of %s:\n", os.Args[0])
 		fmt.Printf("\t%s [OPTION] FILE\n", os.Args[0])

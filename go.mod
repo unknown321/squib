@@ -1,4 +1,4 @@
-module tnt
+module squib
 
 go 1.24.0
 

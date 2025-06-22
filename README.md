@@ -1,9 +1,9 @@
-TNT: MGSV:TPP save decoder
+Squib: MGSV:TPP save decoder
 ====
 
 ```
-Usage of ./tnt:
-	./tnt [OPTION] FILE
+Usage of ./squib:
+	./squib [OPTION] FILE
 
 Options:
   -keysOnly
@@ -16,7 +16,7 @@ Decoded file is created in the same directory with '_decoded' suffix.
 #### Example
 
 ```shell
-$ ./tnt /tmp/PERSONAL_DATA1 
+$ ./squib /tmp/PERSONAL_DATA1 
 0xb8            eulaVersion: 36
 0xd0            infoId: 65535
 0xd8            infoIdForMGO: 65535
