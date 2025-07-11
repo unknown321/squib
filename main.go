@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"crypto/md5"
 	"embed"
 	_ "embed"
@@ -10,10 +9,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"sort"
+	"squib/dictionary"
+	"squib/save"
 	"strings"
-
-	"github.com/unknown321/hashing"
 )
 
 // 0x1401af4e0
@@ -46,17 +44,17 @@ func Decrypt(key string, data []byte) {
 	}
 }
 
-//go:embed save_dict
-//go:embed config_dict
-//go:embed personal_dict
-//go:embed graphics_dict
-//go:embed mgo_dict
+//go:embed savevars.txt
 var f embed.FS
 
 func main() {
 	var keysOnly bool
+	var key string
+	var encode bool
 	flag.CommandLine.SetOutput(os.Stdout)
 	flag.BoolVar(&keysOnly, "keysOnly", false, "print only keys without address and values")
+	flag.StringVar(&key, "key", "", "decryption key, see GAME_SAVE_FILE_NAME in TppDefine.lua")
+	flag.BoolVar(&encode, "encode", false, "encode file")
 	flag.Parse()
 
 	if len(os.Args) < 2 {
@@ -73,89 +71,69 @@ func main() {
 		os.Exit(1)
 	}
 
-	data, _ := f.ReadFile("save_dict")
-	configData, _ := f.ReadFile("config_dict")
-	personalData, _ := f.ReadFile("personal_dict")
-	graphicsData, _ := f.ReadFile("graphics_dict")
-	mgoData, _ := f.ReadFile("mgo_dict")
-
-	var dictData []byte
-	dictData, _ = os.ReadFile("./dict.txt")
-
-	data = append(data, dictData...)
-	data = append(data, configData...)
-	data = append(data, personalData...)
-	data = append(data, graphicsData...)
-	data = append(data, mgoData...)
-
-	dd := bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
-	lines := bytes.Split(dd, []byte("\n"))
-
-	dict := map[uint32][]byte{}
-	for _, line := range lines {
-		if len(line) > 100 {
-			continue
-		}
-		v := uint32(hashing.StrCode64(bytes.TrimSuffix(line, []byte("\n"))) & 0xffffffff) // known as strcode32 in HashWrangler
-		dict[v] = line
-	}
-
 	var filename string
-	if len(os.Args) < 2 {
-		filename = "TPP_GAME_DATA1"
-	} else {
-		filename = os.Args[1]
-		if os.Args[1] == "-keysOnly" {
-			filename = os.Args[2]
-		}
+	if len(flag.Args()) < 1 {
+		slog.Error("please provide filename")
+		os.Exit(1)
 	}
 
-	s, err := os.ReadFile(filename)
+	filename = flag.Args()[0]
+	saveData, err := os.ReadFile(filename)
 	if err != nil {
 		slog.Error("open file", "error", err.Error(), "filename", filename)
 		os.Exit(1)
 	}
 
-	keys := []string{"TPP_GAME_DATA", "TPP_CONFIG_DATA", "PERSONAL_DATA", "TPP_GRAPHICS_CONFIG", "MGO_GAME_DATA"}
-	var key string
-	for _, k := range keys {
-		if strings.Contains(filename, k) {
-			key = k
-			break
-		}
-	}
-	if key == "" {
-		slog.Error("file must have one of accepted names;", "names", fmt.Sprintf("%+v", keys))
+	if err = dictionary.Init(&f); err != nil {
+		slog.Error("open dict", "error", err.Error())
 		os.Exit(1)
 	}
 
-	Decrypt(key, s)
+	keys := []string{"TPP_GAME_DATA", "TPP_CONFIG_DATA", "PERSONAL_DATA", "TPP_GRAPHICS_CONFIG", "MGO_GAME_DATA"}
+	if key == "" {
+		for _, k := range keys {
+			if strings.Contains(filename, k) {
+				key = k
+				break
+			}
+		}
+	}
+
+	if key == "" {
+		slog.Error("decryption key not provided")
+		os.Exit(1)
+	}
+
+	if encode {
+		slog.Info("encoding")
+	} else {
+		slog.Info("decoding")
+	}
+
+	Decrypt(key, saveData)
+
+	s := &save.Save{}
+	if err = s.Parse(saveData, dictionary.Dict); err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
+	}
+
+	//os.Exit(1)
 
 	out := filename + "_decoded"
-	if err = os.WriteFile(out, s, 0644); err != nil {
-		slog.Error("save decoded", "error", err.Error(), "filename", out)
+	if encode {
+		out = strings.TrimSuffix(filename, "_decoded")
+	}
+
+	if err = os.WriteFile(out, saveData, 0644); err != nil {
+		slog.Error("save", "error", err.Error(), "filename", out)
 		os.Exit(1)
 	}
 
-	ss := make([]byte, 4)
-	var indexes []int
-	for k := range dict {
-		binary.LittleEndian.PutUint32(ss, k)
-		ii := bytes.Index(s, ss)
-		if ii > 0 {
-			indexes = append(indexes, ii)
-		}
-	}
+	slog.Info("saved", "output file", out)
 
-	sort.Ints(indexes)
-	for _, v := range indexes {
-		saveKey := dict[binary.LittleEndian.Uint32(s[v:])]
-		saveValue := binary.LittleEndian.Uint32(s[v+4:])
-		if keysOnly {
-			fmt.Printf("%s\n", saveKey)
-		} else {
-			fmt.Printf("0x%x\t\t%s: %d\n", v, saveKey, saveValue)
-		}
+	if encode {
+		os.Exit(0)
 	}
 
 	// encrypt, need to add md5

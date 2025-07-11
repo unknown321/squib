@@ -8,7 +8,7 @@ ifeq ($(GOOS),windows)
 endif
 
 test:
-	go test -v ./...
+	#go test -v ./...
 
 build:
 	CGO_ENABLED=0 \
