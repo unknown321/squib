@@ -2,6 +2,7 @@ package save
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/binary"
 	"fmt"
 	"log/slog"
@@ -22,41 +23,71 @@ type ScriptVars struct {
 	Header []byte
 }
 
-type SaveGroup struct {
-	GroupID      uint16 // not groupbit
+type Section struct {
+	SectionID    uint16 // NOT groupbit
 	EntriesCount uint16
 	DataOffset   uint32
 }
 
-type HashEntry struct {
+type Key struct {
 	Hash   uint32
-	Param1 uint16
+	Param1 uint16 // can be filled with index from indexes table
 	Param2 uint16
 }
 
-type EntryParam struct {
+type ValueParam struct {
 	Offset    uint32
 	ArraySize uint16
 	Size      size.ESize
 	_         byte
 }
 
-type Table struct {
+type CategoryTable struct {
 	Indexes     []uint16
-	Entries     []HashEntry
-	EntryParams []EntryParam
+	Keys        []Key
+	ValueParams []ValueParam
 }
 
 type Save struct {
-	Header        [16]byte
+	Header        [16]byte // md5sum(TPP_GAME_DATA), see Decrypt
 	Magic         [4]byte
 	Type          savetype.ESaveType
 	MysteryByte   byte // manually set to zero
 	GroupsCount   byte
-	ScriptVersion uint32 // 0x0010063 for PERSONAL_DATA
+	ScriptVersion uint32 // 0x0010063 for PERSONAL_DATA, 0x0001006A for GAME_DATA
 
-	Groups []SaveGroup
-	Table  []Table
+	Groups []Section
+	Table  []CategoryTable
+}
+
+// 0x1401af4e0
+// fox::FoxGameSaveCommon::DecodeSaveData
+func Decrypt(key string, data []byte) {
+	hash := md5.Sum([]byte(key))
+
+	hashState := binary.LittleEndian.Uint32(hash[:])
+
+	for i := 0; i <= len(data)-4; i += 4 {
+		hashState ^= hashState << 0xd
+		hashState ^= hashState >> 7
+		hashState ^= hashState << 5
+
+		block := binary.LittleEndian.Uint32(data[i:])
+		decrypted := block ^ hashState
+		binary.LittleEndian.PutUint32(data[i:], decrypted)
+	}
+
+	remaining := len(data) % 4
+	if remaining > 0 {
+		start := len(data) - remaining
+		hashState ^= hashState << 0xd
+		hashState ^= hashState >> 7
+		tempHash := hashState ^ (hashState << 5)
+
+		for i := 0; i < remaining; i++ {
+			data[start+i] ^= byte(tempHash >> (8 * i))
+		}
+	}
 }
 
 func (s *Save) Parse(rawData []byte, dict dictionary.Dictionary) error {
@@ -77,7 +108,7 @@ func (s *Save) Parse(rawData []byte, dict dictionary.Dictionary) error {
 	fmt.Printf("Type: %s\n", s.Type)
 
 	for range int(s.GroupsCount) {
-		g := SaveGroup{}
+		g := Section{}
 		if err = binary.Read(buf, binary.LittleEndian, &g); err != nil {
 			return err
 		}
@@ -85,8 +116,8 @@ func (s *Save) Parse(rawData []byte, dict dictionary.Dictionary) error {
 	}
 
 	for _, g := range s.Groups {
-		fmt.Printf("Group %d, %d entries\n", g.GroupID, g.EntriesCount)
-		table := Table{}
+		fmt.Printf("Group %d, %d entries\n", g.SectionID, g.EntriesCount)
+		table := CategoryTable{}
 		if g.EntriesCount == 0 {
 			s.Table = append(s.Table, table)
 			continue
@@ -108,48 +139,48 @@ func (s *Save) Parse(rawData []byte, dict dictionary.Dictionary) error {
 		entriesParamOffset := hashesOffset + int(g.EntriesCount)*8
 
 		for range int(g.EntriesCount) {
-			h := HashEntry{}
+			h := Key{}
 			if _, err = binary.Decode(rawData[hashesOffset:], binary.LittleEndian, &h); err != nil {
 				return err
 			}
-			table.Entries = append(table.Entries, h)
+			table.Keys = append(table.Keys, h)
 
 			hashesOffset += 8
 		}
 
 		for range int(g.EntriesCount) {
-			p := EntryParam{}
+			p := ValueParam{}
 			if _, err = binary.Decode(rawData[entriesParamOffset:], binary.LittleEndian, &p); err != nil {
 				return err
 			}
 			entriesParamOffset += 8
-			table.EntryParams = append(table.EntryParams, p)
+			table.ValueParams = append(table.ValueParams, p)
 		}
 
 		for i := range int(g.EntriesCount) {
-			offset := table.EntryParams[i].Offset
-			valueSize := table.EntryParams[i].Size
+			offset := table.ValueParams[i].Offset
+			valueSize := table.ValueParams[i].Size
 			fullsize := 0
 			sizeOffset := 16
 			switch valueSize {
 			case size.Bool, size.UInt8, size.Int8:
-				fullsize = 1 * int(table.EntryParams[i].ArraySize)
+				fullsize = 1 * int(table.ValueParams[i].ArraySize)
 			case size.Int16, size.UInt16:
-				fullsize = 2 * int(table.EntryParams[i].ArraySize)
+				fullsize = 2 * int(table.ValueParams[i].ArraySize)
 			case size.UInt32, size.Int32, size.Float:
-				fullsize = 4 * int(table.EntryParams[i].ArraySize)
+				fullsize = 4 * int(table.ValueParams[i].ArraySize)
 			}
 			o1 := sizeOffset + int(offset)
 			o2 := int(offset) + fullsize + sizeOffset
 			value := rawData[o1:o2]
 
-			key, ok := dict[table.Entries[i].Hash]
+			key, ok := dict[table.Keys[i].Hash]
 			if !ok {
-				slog.Info("hash not found", "hash", fmt.Sprintf("%08x", table.Entries[i].Hash))
+				slog.Info("hash not found", "hash", fmt.Sprintf("%08x", table.Keys[i].Hash))
 				continue
 			}
 
-			arrs := table.EntryParams[i].ArraySize
+			arrs := table.ValueParams[i].ArraySize
 			out := ""
 			switch valueSize {
 			case size.Bool:

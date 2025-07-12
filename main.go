@@ -1,10 +1,8 @@
 package main
 
 import (
-	"crypto/md5"
 	"embed"
 	_ "embed"
-	"encoding/binary"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -13,36 +11,6 @@ import (
 	"squib/save"
 	"strings"
 )
-
-// 0x1401af4e0
-// fox::FoxGameSaveCommon::DecodeSaveData
-func Decrypt(key string, data []byte) {
-	hash := md5.Sum([]byte(key))
-
-	hashState := binary.LittleEndian.Uint32(hash[:])
-
-	for i := 0; i <= len(data)-4; i += 4 {
-		hashState ^= hashState << 0xd
-		hashState ^= hashState >> 7
-		hashState ^= hashState << 5
-
-		block := binary.LittleEndian.Uint32(data[i:])
-		decrypted := block ^ hashState
-		binary.LittleEndian.PutUint32(data[i:], decrypted)
-	}
-
-	remaining := len(data) % 4
-	if remaining > 0 {
-		start := len(data) - remaining
-		hashState ^= hashState << 0xd
-		hashState ^= hashState >> 7
-		tempHash := hashState ^ (hashState << 5)
-
-		for i := 0; i < remaining; i++ {
-			data[start+i] ^= byte(tempHash >> (8 * i))
-		}
-	}
-}
 
 //go:embed savevars.txt
 var f embed.FS
@@ -93,6 +61,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	// TPP_GRAPHICS_CONFIG is plain json
 	keys := []string{"TPP_GAME_DATA", "TPP_CONFIG_DATA", "PERSONAL_DATA", "MGO_GAME_DATA"}
 	if key == "" {
 		for _, k := range keys {
@@ -110,42 +79,31 @@ func main() {
 
 	if encode {
 		slog.Info("encoding")
-	} else {
-		slog.Info("decoding")
+		save.Decrypt(key, saveData)
+		out := strings.TrimSuffix(filename, "_decoded")
+		if err = os.WriteFile(out, saveData, 0644); err != nil {
+			slog.Error("encode", "error", err.Error(), "filename", out)
+			os.Exit(1)
+		}
+		slog.Info("encoded", "output file", out)
+		os.Exit(0)
 	}
 
-	Decrypt(key, saveData)
-
-	//os.Exit(1)
+	slog.Info("decoding")
+	save.Decrypt(key, saveData)
 
 	out := filename + "_decoded"
-	if encode {
-		out = strings.TrimSuffix(filename, "_decoded")
-	}
 
 	if err = os.WriteFile(out, saveData, 0644); err != nil {
 		slog.Error("save", "error", err.Error(), "filename", out)
 		os.Exit(1)
 	}
 
-	slog.Info("saved", "output file", out)
+	slog.Info("decoded", "output file", out)
 
 	s := &save.Save{}
 	if err = s.Parse(saveData, dictionary.Dict); err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)
 	}
-
-	if encode {
-		os.Exit(0)
-	}
-
-	// encrypt, need to add md5
-	//Decrypt(key, s)
-	//os.WriteFile("/tmp/encoded", s, 0644)
-	//
-	//sold2, err := os.ReadFile("/tmp/decoded")
-	//if err != nil {
-	//	panic(err)
-	//}
 }

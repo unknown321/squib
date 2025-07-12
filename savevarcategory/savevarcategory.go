@@ -1,4 +1,4 @@
-package category
+package savevarcategory
 
 type ESaveVarCategory uint8
 
