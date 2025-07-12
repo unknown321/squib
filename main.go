@@ -16,11 +16,9 @@ import (
 var f embed.FS
 
 func main() {
-	var keysOnly bool
 	var key string
 	var encode bool
 	flag.CommandLine.SetOutput(os.Stdout)
-	flag.BoolVar(&keysOnly, "keysOnly", false, "print only keys without address and values")
 	flag.StringVar(&key, "key", "", "decryption key, see GAME_SAVE_FILE_NAME in TppDefine.lua")
 	flag.BoolVar(&encode, "encode", false, "encode file")
 	flag.Parse()
@@ -36,6 +34,7 @@ func main() {
 		fmt.Println()
 		fmt.Println("Provide more keys by adding them to dict.txt in the same directory as executable.")
 		fmt.Println("Decoded file is created in the same directory with '_decoded' suffix.")
+		fmt.Println("Encoded file is created in the same directory without '_decoded' suffix. Encoding will overwrite existing files.")
 	}
 
 	if len(os.Args) < 2 {

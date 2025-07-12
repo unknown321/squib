@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"embed"
 	"github.com/unknown321/hashing"
+	"os"
 )
 
 type Dictionary map[uint32][]byte
 
-var Dict = make(map[uint32][]byte)
+var Dict Dictionary = make(map[uint32][]byte)
 
 func Init(f *embed.FS) error {
 	data, err := f.ReadFile("savevars.txt")
@@ -16,9 +17,9 @@ func Init(f *embed.FS) error {
 		return err
 	}
 
-	//var dictData []byte
-	//dictData, _ = os.ReadFile("./dict.txt")
-	//data = append(data, dictData...)
+	var dictData []byte
+	dictData, _ = os.ReadFile("./dict.txt")
+	data = append(data, dictData...)
 
 	dd := bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
 	lines := bytes.Split(dd, []byte("\n"))
