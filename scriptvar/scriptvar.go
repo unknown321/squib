@@ -41,11 +41,11 @@ type CategoryTable struct {
 type ScriptVar struct {
 	Type          savetype.ESaveType
 	MysteryByte   byte // manually set to zero
-	GroupsCount   byte
+	SectionsCount byte
 	ScriptVersion uint32 // 0x0010063 for PERSONAL_DATA, 0x0001006A for GAME_DATA
 
-	Groups []Section
-	Table  []CategoryTable
+	Sections []Section
+	Table    []CategoryTable
 }
 
 func (s *ScriptVar) Parse(rawData []byte, dict dictionary.Dictionary) error {
@@ -54,25 +54,25 @@ func (s *ScriptVar) Parse(rawData []byte, dict dictionary.Dictionary) error {
 	for i, v := range []any{
 		&s.Type,
 		&s.MysteryByte,
-		&s.GroupsCount,
+		&s.SectionsCount,
 		&s.ScriptVersion,
 	} {
 		if err = binary.Read(buf, binary.LittleEndian, v); err != nil {
 			return fmt.Errorf("binary read field %d: %w", i, err)
 		}
 	}
-	fmt.Printf("SVAR, Type: %s, version: %#08x\n", s.Type, s.ScriptVersion)
+	fmt.Printf("ScriptVar, type: %s, version: %#08x\n", s.Type, s.ScriptVersion)
 
-	for range int(s.GroupsCount) {
+	for range int(s.SectionsCount) {
 		g := Section{}
 		if err = binary.Read(buf, binary.LittleEndian, &g); err != nil {
 			return err
 		}
-		s.Groups = append(s.Groups, g)
+		s.Sections = append(s.Sections, g)
 	}
 
-	for _, g := range s.Groups {
-		fmt.Printf("Group %d, %d entries\n", g.SectionID, g.EntriesCount)
+	for _, g := range s.Sections {
+		fmt.Printf("Section %d, %d entries\n", g.SectionID, g.EntriesCount)
 		table := CategoryTable{}
 		if g.EntriesCount == 0 {
 			s.Table = append(s.Table, table)

@@ -3,7 +3,6 @@ package save
 import (
 	"crypto/md5"
 	"encoding/binary"
-	"os"
 	"reflect"
 	"squib/dictionary"
 	"squib/scriptvar"
@@ -64,33 +63,30 @@ func (s *Save) Parse(rawData []byte, dict dictionary.Dictionary) error {
 	}
 	off += len(s.Header)
 
-	for {
-		magic := rawData[off : off+4]
-		off += 4
+	magic := rawData[off : off+4]
+	off += 4
 
-		switch string(magic) {
-		case scriptvarscompositeslot.Magic:
-			if err = s.Svcs.Parse(rawData[off:]); err != nil {
+	switch string(magic) {
+	case scriptvarscompositeslot.Magic:
+		if err = s.Svcs.Parse(rawData[off:]); err != nil {
+			return err
+		}
+		off += int(reflect.TypeOf(s.Svcs).Size())
+
+		for _, e := range s.Svcs.Entries {
+			sv := scriptvar.ScriptVar{}
+			if err = sv.Parse(rawData[e.Offset+16+4:], dict); err != nil {
 				return err
 			}
-			off += int(reflect.TypeOf(s.Svcs).Size())
-		case scriptvar.Magic:
-			if s.Svcs.Count == 0 {
-				sv := scriptvar.ScriptVar{}
-				if err = sv.Parse(rawData[off:], dict); err != nil {
-					return err
-				}
-				s.ScriptVar = append(s.ScriptVar, sv)
-			} else {
-				for _, e := range s.Svcs.Entries {
-					sv := scriptvar.ScriptVar{}
-					if err = sv.Parse(rawData[e.Offset+16+4:], dict); err != nil {
-						return err
-					}
-					s.ScriptVar = append(s.ScriptVar, sv)
-				}
+			s.ScriptVar = append(s.ScriptVar, sv)
+		}
+	case scriptvar.Magic:
+		if s.Svcs.Count == 0 {
+			sv := scriptvar.ScriptVar{}
+			if err = sv.Parse(rawData[off:], dict); err != nil {
+				return err
 			}
-			os.Exit(1)
+			s.ScriptVar = append(s.ScriptVar, sv)
 		}
 	}
 
