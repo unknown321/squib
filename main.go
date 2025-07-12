@@ -89,7 +89,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	keys := []string{"TPP_GAME_DATA", "TPP_CONFIG_DATA", "PERSONAL_DATA", "TPP_GRAPHICS_CONFIG", "MGO_GAME_DATA"}
+	keys := []string{"TPP_GAME_DATA", "TPP_CONFIG_DATA", "PERSONAL_DATA", "MGO_GAME_DATA"}
 	if key == "" {
 		for _, k := range keys {
 			if strings.Contains(filename, k) {
@@ -112,12 +112,6 @@ func main() {
 
 	Decrypt(key, saveData)
 
-	s := &save.Save{}
-	if err = s.Parse(saveData, dictionary.Dict); err != nil {
-		slog.Error(err.Error())
-		os.Exit(1)
-	}
-
 	//os.Exit(1)
 
 	out := filename + "_decoded"
@@ -131,6 +125,12 @@ func main() {
 	}
 
 	slog.Info("saved", "output file", out)
+
+	s := &save.Save{}
+	if err = s.Parse(saveData, dictionary.Dict); err != nil {
+		slog.Error(err.Error())
+		os.Exit(1)
+	}
 
 	if encode {
 		os.Exit(0)
