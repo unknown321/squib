@@ -1,6 +1,6 @@
 package savetype
 
-type ESaveType uint
+type ESaveType uint16
 
 // tpp::gm::impl::BeginScriptVars
 

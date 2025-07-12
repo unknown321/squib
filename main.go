@@ -57,8 +57,8 @@ func main() {
 	flag.BoolVar(&encode, "encode", false, "encode file")
 	flag.Parse()
 
-	if len(os.Args) < 2 {
-		fmt.Println("Squib: MGSV:TPP save decoder")
+	flag.Usage = func() {
+		fmt.Println("squib: MGSV:TPP save decoder")
 		fmt.Println()
 		fmt.Printf("Usage of %s:\n", os.Args[0])
 		fmt.Printf("\t%s [OPTION] FILE\n", os.Args[0])
@@ -68,6 +68,10 @@ func main() {
 		fmt.Println()
 		fmt.Println("Provide more keys by adding them to dict.txt in the same directory as executable.")
 		fmt.Println("Decoded file is created in the same directory with '_decoded' suffix.")
+	}
+
+	if len(os.Args) < 2 {
+		flag.Usage()
 		os.Exit(1)
 	}
 

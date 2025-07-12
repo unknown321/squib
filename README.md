@@ -1,4 +1,4 @@
-Squib: MGSV:TPP save decoder
+squib: MGSV:TPP save decoder
 ====
 
 ```

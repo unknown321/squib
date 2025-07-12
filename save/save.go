@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"squib/dictionary"
+	"squib/savetype"
 	"squib/size"
 )
 
@@ -47,12 +48,12 @@ type Table struct {
 }
 
 type Save struct {
-	Header       [16]byte
-	Magic        [4]byte
-	Type         uint16
-	MysteryByte  byte // manually set to zero
-	GroupsCount  byte
-	MysteryParam uint32 // 0x0010063 for PERSONAL_DATA
+	Header        [16]byte
+	Magic         [4]byte
+	Type          savetype.ESaveType
+	MysteryByte   byte // manually set to zero
+	GroupsCount   byte
+	ScriptVersion uint32 // 0x0010063 for PERSONAL_DATA
 
 	Groups []SaveGroup
 	Table  []Table
@@ -67,12 +68,13 @@ func (s *Save) Parse(rawData []byte, dict dictionary.Dictionary) error {
 		&s.Type,
 		&s.MysteryByte,
 		&s.GroupsCount,
-		&s.MysteryParam,
+		&s.ScriptVersion,
 	} {
 		if err = binary.Read(buf, binary.LittleEndian, v); err != nil {
 			return fmt.Errorf("binary read field %d: %w", i, err)
 		}
 	}
+	fmt.Printf("Type: %s\n", s.Type)
 
 	for range int(s.GroupsCount) {
 		g := SaveGroup{}
