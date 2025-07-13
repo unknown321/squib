@@ -48,32 +48,37 @@ func Decode(key string, data []byte) {
 }
 
 type Save struct {
-	Header    [16]byte // md5sum(TPP_GAME_DATA), see Decode
-	Magic     [4]byte
-	Svcs      scriptvarscompositeslot.ScriptVarsCompositeSlot
-	ScriptVar []scriptvar.ScriptVar
+	Checksum      [16]byte // md5sum(TPP_GAME_DATA), see Decode
+	Magic         [4]byte
+	CompositeSlot scriptvarscompositeslot.ScriptVarsCompositeSlot
+	ScriptVar     []scriptvar.ScriptVar
 }
 
 func (s *Save) Parse(rawData []byte, dict dictionary.Dictionary) error {
 	var err error
 	off := 0
 
-	if _, err = binary.Decode(rawData, binary.LittleEndian, &s.Header); err != nil {
+	if _, err = binary.Decode(rawData, binary.LittleEndian, &s.Checksum); err != nil {
 		return err
 	}
-	off += len(s.Header)
+	off += len(s.Checksum)
+
+	sum := md5.Sum(rawData[off:])
+	if bytes.Compare(sum[:], s.Checksum[:]) != 0 {
+		return fmt.Errorf("bad data checksum, want %x, got %x", s.Checksum, sum)
+	}
 
 	magic := rawData[off : off+4]
 	off += 4
 
 	switch string(magic) {
 	case scriptvarscompositeslot.Magic:
-		if err = s.Svcs.Parse(rawData[off:]); err != nil {
+		if err = s.CompositeSlot.Parse(rawData[off:]); err != nil {
 			return err
 		}
-		off += int(reflect.TypeOf(s.Svcs).Size())
+		off += int(reflect.TypeOf(s.CompositeSlot).Size())
 
-		for _, e := range s.Svcs.Entries {
+		for _, e := range s.CompositeSlot.Entries {
 			sv := scriptvar.ScriptVar{}
 			if err = sv.Parse(rawData[e.Offset+16+4:], dict); err != nil {
 				return err
@@ -81,7 +86,7 @@ func (s *Save) Parse(rawData []byte, dict dictionary.Dictionary) error {
 			s.ScriptVar = append(s.ScriptVar, sv)
 		}
 	case scriptvar.Magic:
-		if s.Svcs.Count == 0 {
+		if s.CompositeSlot.Count == 0 {
 			sv := scriptvar.ScriptVar{}
 			if err = sv.Parse(rawData[off:], dict); err != nil {
 				return err
