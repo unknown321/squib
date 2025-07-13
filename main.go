@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	_ "embed"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"squib/dictionary"
 	"squib/save"
 	"strings"
+	"time"
 )
 
 //go:embed savevars.txt
@@ -18,9 +20,13 @@ var f embed.FS
 func main() {
 	var key string
 	var encode bool
+	var noBackup bool
+	var js bool
 	flag.CommandLine.SetOutput(os.Stdout)
 	flag.StringVar(&key, "key", "", "decryption key, see GAME_SAVE_FILE_NAME in TppDefine.lua")
 	flag.BoolVar(&encode, "encode", false, "encode file")
+	flag.BoolVar(&js, "json", false, "dump to json")
+	flag.BoolVar(&noBackup, "noBackup", false, "do not create backup while encoding")
 	flag.Parse()
 
 	flag.Usage = func() {
@@ -78,8 +84,18 @@ func main() {
 
 	if encode {
 		slog.Info("encoding")
-		save.Decrypt(key, saveData)
+		save.Decode(key, saveData)
 		out := strings.TrimSuffix(filename, "_decoded")
+		if !noBackup {
+			if _, err = os.Stat(out); err == nil {
+				backupName := fmt.Sprintf("%s.%d.backup", out, time.Now().Unix())
+				if err = os.Rename(out, backupName); err != nil {
+					slog.Error("Cannot create backup", "original file", out, "error", err.Error())
+					os.Exit(1)
+				}
+				slog.Info("Created backup", "filename", backupName)
+			}
+		}
 		if err = os.WriteFile(out, saveData, 0644); err != nil {
 			slog.Error("encode", "error", err.Error(), "filename", out)
 			os.Exit(1)
@@ -89,10 +105,9 @@ func main() {
 	}
 
 	slog.Info("decoding")
-	save.Decrypt(key, saveData)
+	save.Decode(key, saveData)
 
 	out := filename + "_decoded"
-
 	if err = os.WriteFile(out, saveData, 0644); err != nil {
 		slog.Error("save", "error", err.Error(), "filename", out)
 		os.Exit(1)
@@ -104,5 +119,17 @@ func main() {
 	if err = s.Parse(saveData, dictionary.Dict); err != nil {
 		slog.Error(err.Error())
 		os.Exit(1)
+	}
+
+	if js && !encode {
+		res, err := json.MarshalIndent(s, "", "    ")
+		if err != nil {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
+		if err = os.WriteFile(filename+".json", res, 0644); err != nil {
+			slog.Error(err.Error())
+			os.Exit(1)
+		}
 	}
 }

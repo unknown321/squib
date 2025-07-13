@@ -19,7 +19,7 @@ import (
 
 // 0x1401af4e0
 // fox::FoxGameSaveCommon::DecodeSaveData
-func Decrypt(key string, data []byte) {
+func Decode(key string, data []byte) {
 	hash := md5.Sum([]byte(key))
 
 	hashState := binary.LittleEndian.Uint32(hash[:])
@@ -48,7 +48,7 @@ func Decrypt(key string, data []byte) {
 }
 
 type Save struct {
-	Header    [16]byte // md5sum(TPP_GAME_DATA), see Decrypt
+	Header    [16]byte // md5sum(TPP_GAME_DATA), see Decode
 	Magic     [4]byte
 	Svcs      scriptvarscompositeslot.ScriptVarsCompositeSlot
 	ScriptVar []scriptvar.ScriptVar

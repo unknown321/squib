@@ -29,7 +29,7 @@ type ValueParam struct {
 	Offset    uint32
 	ArraySize uint16
 	Size      size.ESize
-	_         byte
+	Skip      byte
 }
 
 type CategoryTable struct {

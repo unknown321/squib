@@ -15,7 +15,7 @@ type Entry struct {
 
 type ScriptVarsCompositeSlot struct {
 	Type    uint16
-	_       byte
+	Skip    byte
 	Count   int
 	Entries []Entry
 }
