@@ -1,8 +1,12 @@
 package save
 
 import (
+	"bytes"
 	"crypto/md5"
 	"encoding/binary"
+	"fmt"
+	"io"
+	"os"
 	"reflect"
 	"squib/dictionary"
 	"squib/scriptvar"
@@ -93,6 +97,34 @@ func (s *Save) Parse(rawData []byte, dict dictionary.Dictionary) error {
 			}
 			s.ScriptVar = append(s.ScriptVar, sv)
 		}
+	}
+
+	return nil
+}
+
+func (s *Save) Write(filename string) error {
+	f, err := os.CreateTemp("", "squib-*")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name())
+
+	_, _ = f.Seek(16, io.SeekStart)
+
+	if s.CompositeSlot.Count != 0 {
+		if err = s.CompositeSlot.Write(f); err != nil {
+			return err
+		}
+	}
+
+	for i, v := range s.ScriptVar {
+		if err = v.Write(f, i); err != nil {
+			return err
+		}
+	}
+
+	if err = os.Rename(f.Name(), filename); err != nil {
+		return err
 	}
 
 	return nil

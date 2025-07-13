@@ -2,6 +2,8 @@ package scriptvarscompositeslot
 
 import (
 	"encoding/binary"
+	"fmt"
+	"io"
 	"reflect"
 )
 
@@ -11,6 +13,17 @@ type Entry struct {
 	Offset uint32
 	Size1  uint32
 	Size2  uint32
+}
+
+func (e *Entry) Write(w io.Writer) error {
+	v := []uint32{e.Offset, e.Size1, e.Size2}
+	for _, vv := range v {
+		if err := binary.Write(w, binary.LittleEndian, vv); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type ScriptVarsCompositeSlot struct {
@@ -38,6 +51,24 @@ func (s *ScriptVarsCompositeSlot) Parse(rawData []byte) error {
 		}
 		s.Entries = append(s.Entries, e)
 		offset += int(reflect.TypeOf(e).Size())
+	}
+
+	return nil
+}
+
+func (s *ScriptVarsCompositeSlot) Write(w io.Writer) error {
+	var err error
+	v := []any{[]byte(Magic), s.Type, s.Skip, byte(s.Count)}
+	for i, k := range v {
+		if err = binary.Write(w, binary.LittleEndian, k); err != nil {
+			return fmt.Errorf("composite slot struct key %d: %w", i, err)
+		}
+	}
+
+	for _, e := range s.Entries {
+		if err = e.Write(w); err != nil {
+			return err
+		}
 	}
 
 	return nil

@@ -121,6 +121,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = s.Write("new"); err != nil {
+		slog.Error("Write", "error", err.Error())
+		os.Exit(1)
+	}
+
 	if js && !encode {
 		res, err := json.MarshalIndent(s, "", "    ")
 		if err != nil {
