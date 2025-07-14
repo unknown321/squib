@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/unknown321/squib/dictionary"
+	"github.com/unknown321/squib/savetype"
+	"github.com/unknown321/squib/size"
 	"log/slog"
-	"squib/dictionary"
-	"squib/savetype"
-	"squib/size"
 	"strings"
 )
 

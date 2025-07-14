@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/unknown321/squib/dictionary"
+	"github.com/unknown321/squib/save"
 	"log/slog"
 	"os"
-	"squib/dictionary"
-	"squib/save"
 	"strings"
 	"time"
 )

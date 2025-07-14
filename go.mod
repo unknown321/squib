@@ -1,4 +1,4 @@
-module squib
+module github.com/unknown321/squib
 
 go 1.24.0
 

@@ -5,10 +5,10 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"fmt"
+	"github.com/unknown321/squib/dictionary"
+	"github.com/unknown321/squib/scriptvar"
+	"github.com/unknown321/squib/scriptvarscompositeslot"
 	"reflect"
-	"squib/dictionary"
-	"squib/scriptvar"
-	"squib/scriptvarscompositeslot"
 )
 
 // 0x140B285A7

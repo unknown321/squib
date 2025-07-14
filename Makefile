@@ -15,6 +15,7 @@ build:
 				GOOS=$(GOOS)\
 				GOARCH=$(GOARCH) \
 				go build -trimpath \
+				-buildvcs=true \
 				-o $(NAME)
 
 release: test
