@@ -42,7 +42,7 @@ type ScriptVar struct {
 	Type          savetype.ESaveType
 	MysteryByte   byte // manually set to zero
 	SectionsCount byte
-	ScriptVersion uint32 // 0x0010063 for PERSONAL_DATA, 0x0001006A for GAME_DATA
+	ScriptVersion uint32 // 0x0010063 for PERSONAL_DATA, 0x0001006A for GAME_DATA. Actual value is `ScriptVersion - TppDefine.PROGRAM_SAVE_FILE_VERSION_OFFSET`
 
 	Sections []Section
 	Table    []CategoryTable
