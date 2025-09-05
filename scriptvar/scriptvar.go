@@ -137,7 +137,7 @@ func (s *ScriptVar) Parse(rawData []byte, dict dictionary.Dictionary) error {
 			key, ok := dict[table.Keys[i].Hash]
 			if !ok {
 				slog.Info("hash not found", "hash", fmt.Sprintf("%08x", table.Keys[i].Hash))
-				continue
+				key = []byte(fmt.Sprintf("%x", table.Keys[i].Hash))
 			}
 
 			arrs := table.ValueParams[i].ArraySize
