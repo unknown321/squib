@@ -71,8 +71,8 @@ func (s *Save) Parse(rawData []byte, dict dictionary.Dictionary) error {
 		return fmt.Errorf("bad data checksum, want %x, got %x", s.Checksum, sum)
 	}
 
-	magic := rawData[off : off+4]
-	off += 4
+	magic := rawData[off : off+len(s.Magic)]
+	off += len(s.Magic)
 
 	switch string(magic) {
 	case scriptvarscompositeslot.Magic:
@@ -82,7 +82,7 @@ func (s *Save) Parse(rawData []byte, dict dictionary.Dictionary) error {
 
 		for _, e := range s.CompositeSlot.Entries {
 			sv := scriptvar.ScriptVar{}
-			if err = sv.Parse(rawData[e.Offset+16+4:], dict); err != nil {
+			if err = sv.Parse(rawData[int(e.Offset)+len(s.Checksum)+len(s.Magic):], dict); err != nil {
 				return err
 			}
 			s.ScriptVar = append(s.ScriptVar, sv)
