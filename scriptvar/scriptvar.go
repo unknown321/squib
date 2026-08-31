@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log/slog"
+	"strings"
+
 	"github.com/unknown321/squib/dictionary"
 	"github.com/unknown321/squib/savetype"
 	"github.com/unknown321/squib/size"
-	"log/slog"
-	"strings"
 )
 
 var Magic = "SVAR"
@@ -61,13 +62,14 @@ func (s *ScriptVar) Parse(rawData []byte, dict dictionary.Dictionary) error {
 			return fmt.Errorf("binary read field %d: %w", i, err)
 		}
 	}
-	fmt.Printf("ScriptVar, type: %s, version: %#08x\n", s.Type, s.ScriptVersion)
 
+	fmt.Printf("ScriptVar, type: %s, version: %#08x\n", s.Type, s.ScriptVersion)
 	for range int(s.SectionsCount) {
 		g := Section{}
 		if err = binary.Read(buf, binary.LittleEndian, &g); err != nil {
 			return err
 		}
+
 		s.Sections = append(s.Sections, g)
 	}
 
@@ -93,14 +95,13 @@ func (s *ScriptVar) Parse(rawData []byte, dict dictionary.Dictionary) error {
 
 		hashesOffset := int(uint64(g.DataOffset+3+uint32(g.EntriesCount)*2)&0xFFFFFFFFFFFFFFFC) - 4
 		entriesParamOffset := hashesOffset + int(g.EntriesCount)*8
-
 		for range int(g.EntriesCount) {
 			h := Key{}
 			if _, err = binary.Decode(rawData[hashesOffset:], binary.LittleEndian, &h); err != nil {
 				return err
 			}
-			table.Keys = append(table.Keys, h)
 
+			table.Keys = append(table.Keys, h)
 			hashesOffset += 8
 		}
 
@@ -109,104 +110,109 @@ func (s *ScriptVar) Parse(rawData []byte, dict dictionary.Dictionary) error {
 			if _, err = binary.Decode(rawData[entriesParamOffset:], binary.LittleEndian, &p); err != nil {
 				return err
 			}
+
 			entriesParamOffset += 8
 			table.ValueParams = append(table.ValueParams, p)
 		}
 
 		for i := range int(g.EntriesCount) {
-			offset := table.ValueParams[i].Offset
-			valueSize := table.ValueParams[i].Size
-			fullsize := 0
-			sizeOffset := -4
-			switch valueSize {
-			case size.Bool, size.UInt8, size.Int8:
-				fullsize = 1 * int(table.ValueParams[i].ArraySize)
-			case size.Int16, size.UInt16:
-				fullsize = 2 * int(table.ValueParams[i].ArraySize)
-			case size.UInt32, size.Int32, size.Float:
-				fullsize = 4 * int(table.ValueParams[i].ArraySize)
-			}
-			o1 := sizeOffset + int(offset)
-			o2 := int(offset) + fullsize + sizeOffset
-			if o1 < 0 {
-				o1 = 0
-				o2 = fullsize
-			}
-			value := rawData[o1:o2]
+			vp := table.ValueParams[i]
+			key := table.Keys[i]
+			var start, end int
+			if vp.Size == size.Bool {
+				startByte := int(vp.Offset / 8)
+				start = entriesParamOffset + startByte
+				end = start + (int(vp.Offset%8)+int(vp.ArraySize)+7)/8
+			} else {
+				fullsize := int(vp.ArraySize)
+				switch vp.Size {
+				case size.Int16, size.UInt16:
+					fullsize *= 2
+				case size.UInt32, size.Int32, size.Float:
+					fullsize *= 4
+				}
 
-			key, ok := dict[table.Keys[i].Hash]
+				start = -4 + int(vp.Offset) // sizeOffset = -4
+				end = start + fullsize
+			}
+
+			value := rawData[start:end]
+			name, ok := dict[key.Hash]
 			if !ok {
-				slog.Info("hash not found", "hash", fmt.Sprintf("%08x", table.Keys[i].Hash))
-				key = []byte(fmt.Sprintf("%x", table.Keys[i].Hash))
+				slog.Info("hash not found", "hash", fmt.Sprintf("%08x", key.Hash))
+				name = []byte(fmt.Sprintf("%x", key.Hash))
 			}
 
-			arrs := table.ValueParams[i].ArraySize
-			out := fmt.Sprintf("\t%s (%d): [", key, arrs)
-			switch valueSize {
+			out := strings.Builder{}
+			fmt.Fprintf(&out, "\t%s (%d): [", name, vp.ArraySize)
+			switch vp.Size {
 			case size.Bool:
-				for index := range int(arrs) {
-					qq := value[index]
-					out += fmt.Sprintf("%t, ", qq > 0)
+				startBit := uint64(vp.Offset % 8)
+				for j := range int(vp.ArraySize) {
+					bitOffset := startBit + uint64(j)
+					qq := (value[bitOffset/8] & (1 << (bitOffset % 8))) != 0
+					fmt.Fprintf(&out, "%t, ", qq)
 				}
 			case size.UInt32:
-				for index := range int(arrs) {
-					qq := binary.LittleEndian.Uint32(value[index*4 : (index+1)*4])
-					out += fmt.Sprintf("%d (%#08x), ", qq, qq)
+				for j := range int(vp.ArraySize) {
+					qq := binary.LittleEndian.Uint32(value[j*4 : (j+1)*4])
+					fmt.Fprintf(&out, "%d (%#08x), ", qq, qq)
 				}
 			case size.Int32:
-				for index := range int(arrs) {
+				for j := range int(vp.ArraySize) {
 					var qq int32
-					if _, err = binary.Decode(value[index*4:(index+1)*4], binary.LittleEndian, &qq); err != nil {
+					if _, err = binary.Decode(value[j*4:(j+1)*4], binary.LittleEndian, &qq); err != nil {
 						return err
 					}
-					out += fmt.Sprintf("%d (%#08x), ", qq, qq)
+
+					fmt.Fprintf(&out, "%d (%#08x), ", qq, qq)
 				}
 			case size.UInt16:
-				for index := range int(arrs) {
-					qq := binary.LittleEndian.Uint16(value[index*2 : (index+1)*2])
-					out += fmt.Sprintf("%d (%#08x), ", qq, qq)
+				for j := range int(vp.ArraySize) {
+					qq := binary.LittleEndian.Uint16(value[j*2 : (j+1)*2])
+					fmt.Fprintf(&out, "%d (%#08x), ", qq, qq)
 				}
 			case size.Int16:
-				for index := range int(arrs) {
+				for j := range int(vp.ArraySize) {
 					var qq int16
-					if _, err = binary.Decode(value[index*2:(index+1)*2], binary.LittleEndian, &qq); err != nil {
+					if _, err = binary.Decode(value[j*2:(j+1)*2], binary.LittleEndian, &qq); err != nil {
 						return err
 					}
-					out += fmt.Sprintf("%d (%#08x), ", qq, qq)
+
+					fmt.Fprintf(&out, "%d (%#08x), ", qq, qq)
 				}
 			case size.UInt8:
-				switch string(key) {
-				case "personalName":
-					out += fmt.Sprintf("%s", bytes.TrimRight(value, "\x00"))
-				default:
-					for index := range int(arrs) {
-						qq := int(value[index*1 : (index+1)*1][0])
-						out += fmt.Sprintf("%d, ", qq)
+				if string(name) == "personalName" {
+					out.Write(bytes.TrimRight(value, "\x00"))
+				} else {
+					for j := range int(vp.ArraySize) {
+						qq := int(value[j*1 : (j+1)*1][0])
+						fmt.Fprintf(&out, "%d, ", qq)
 					}
 				}
 			case size.Int8:
-				for index := range int(arrs) {
+				for j := range int(vp.ArraySize) {
 					var qq int8
-					if _, err = binary.Decode(value[index*1:(index+1)*1], binary.LittleEndian, &qq); err != nil {
+					if _, err = binary.Decode(value[j*1:(j+1)*1], binary.LittleEndian, &qq); err != nil {
 						return err
 					}
-					out += fmt.Sprintf("%d, ", qq)
+
+					fmt.Fprintf(&out, "%d, ", qq)
 				}
 			case size.Float:
-				for index := range int(arrs) {
+				for j := range int(vp.ArraySize) {
 					var qq float32
-					if _, err = binary.Decode(value[index*4:(index+1)*4], binary.LittleEndian, &qq); err != nil {
+					if _, err = binary.Decode(value[j*4:(j+1)*4], binary.LittleEndian, &qq); err != nil {
 						return nil
 					}
-					out += fmt.Sprintf("%f, ", qq)
+
+					fmt.Fprintf(&out, "%f, ", qq)
 				}
 			}
 
-			out = strings.TrimSuffix(out, ", ")
-			out += "]\n"
-
-			fmt.Print(out)
+			fmt.Print(strings.TrimSuffix(out.String(), ", ") + "]\n")
 		}
+
 		s.Table = append(s.Table, table)
 	}
 

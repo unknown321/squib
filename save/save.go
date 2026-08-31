@@ -5,10 +5,10 @@ import (
 	"crypto/md5"
 	"encoding/binary"
 	"fmt"
+
 	"github.com/unknown321/squib/dictionary"
 	"github.com/unknown321/squib/scriptvar"
 	"github.com/unknown321/squib/scriptvarscompositeslot"
-	"reflect"
 )
 
 // 0x140B285A7
@@ -21,6 +21,7 @@ import (
 
 // 0x1401af4e0
 // fox::FoxGameSaveCommon::DecodeSaveData
+
 func Decode(key string, data []byte) {
 	hash := md5.Sum([]byte(key))
 
@@ -43,7 +44,7 @@ func Decode(key string, data []byte) {
 		hashState ^= hashState >> 7
 		tempHash := hashState ^ (hashState << 5)
 
-		for i := 0; i < remaining; i++ {
+		for i := range remaining {
 			data[start+i] ^= byte(tempHash >> (8 * i))
 		}
 	}
@@ -66,23 +67,22 @@ func (s *Save) Parse(rawData []byte, dict dictionary.Dictionary) error {
 	off += len(s.Checksum)
 
 	sum := md5.Sum(rawData[off:])
-	if bytes.Compare(sum[:], s.Checksum[:]) != 0 {
+	if !bytes.Equal(sum[:], s.Checksum[:]) {
 		return fmt.Errorf("bad data checksum, want %x, got %x", s.Checksum, sum)
 	}
 
-	magic := rawData[off : off+4]
-	off += 4
+	magic := rawData[off : off+len(s.Magic)]
+	off += len(s.Magic)
 
 	switch string(magic) {
 	case scriptvarscompositeslot.Magic:
 		if err = s.CompositeSlot.Parse(rawData[off:]); err != nil {
 			return err
 		}
-		off += int(reflect.TypeOf(s.CompositeSlot).Size())
 
 		for _, e := range s.CompositeSlot.Entries {
 			sv := scriptvar.ScriptVar{}
-			if err = sv.Parse(rawData[e.Offset+16+4:], dict); err != nil {
+			if err = sv.Parse(rawData[int(e.Offset)+len(s.Checksum)+len(s.Magic):], dict); err != nil {
 				return err
 			}
 			s.ScriptVar = append(s.ScriptVar, sv)

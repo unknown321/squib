@@ -3,8 +3,9 @@ package dictionary
 import (
 	"bytes"
 	"embed"
-	"github.com/unknown321/hashing"
 	"os"
+
+	"github.com/unknown321/hashing"
 )
 
 type Dictionary map[uint32][]byte
@@ -20,11 +21,8 @@ func Init(f *embed.FS) error {
 	var dictData []byte
 	dictData, _ = os.ReadFile("./dict.txt")
 	data = append(data, dictData...)
-
 	dd := bytes.ReplaceAll(data, []byte("\r\n"), []byte("\n"))
-	lines := bytes.Split(dd, []byte("\n"))
-
-	for _, line := range lines {
+	for line := range bytes.SplitSeq(dd, []byte("\n")) {
 		if len(line) > 100 {
 			continue
 		}
