@@ -22,22 +22,23 @@ type ScriptVarsCompositeSlot struct {
 
 func (s *ScriptVarsCompositeSlot) Parse(rawData []byte) error {
 	var err error
-	offset := 0
+	off := 0
 	if _, err = binary.Decode(rawData, binary.LittleEndian, &s.Type); err != nil {
 		return err
 	}
-	offset += 2
-	offset += 1 // skip
-	s.Count = int(rawData[offset : offset+1][0])
-	offset += 1
+	off += 2
+	off += 1 // skip
+	s.Count = int(rawData[off : off+1][0])
+	off += 1
 
 	for range int(s.Count) {
 		e := Entry{}
-		if _, err = binary.Decode(rawData[offset:], binary.LittleEndian, &e); err != nil {
+		if _, err = binary.Decode(rawData[off:], binary.LittleEndian, &e); err != nil {
 			return err
 		}
 		s.Entries = append(s.Entries, e)
-		offset += int(reflect.TypeOf(e).Size())
+		// NOTE: reflection is expensive and could be removed.
+		off += int(reflect.TypeFor[Entry]().Size()) // off += 12
 	}
 
 	return nil
